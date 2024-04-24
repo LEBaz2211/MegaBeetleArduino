@@ -8,8 +8,8 @@
 #define ENCC 6 // FL
 #define ENCD 4 // FR
 
-#define FRONT_SENSOR_PIN 9
-#define BACK_SENSOR_PIN 12
+#define FRONT_SENSOR_PIN 12
+#define BACK_SENSOR_PIN 9
 #define LEFT_SENSOR_PIN 8
 #define RIGHT_SENSOR_PIN 11
 
@@ -18,9 +18,8 @@ struct Task
   char type;   // 'F' for forward, 'B' for backward, 'L' for left, 'R' for right, 'T' for turn
   float value; // distance in cm for linear movements, angle in degrees for turns
   float speed; // speed of the movement
-  float degrees;
-  bool calibrationEnd;
   float calibrationRollbackDist;
+  bool calibrationEnd;
 };
 
 std::vector<Task> taskQueue;
@@ -29,7 +28,7 @@ int switchPin = 2;
 bool systemActive = false;
 unsigned long previousRunTime = 0;
 unsigned long startRunTime = 0;
-const long maxRunTime = 100000;
+const long maxRunTime = 1000000;
 bool resetSequence = false;
 bool timeExceeded = false;
 
@@ -59,9 +58,9 @@ unsigned long currentTime = 0;
 unsigned long prevTimePID = 0;
 unsigned long currentTimePID = 0;
 
-float kp = 1.2;   // 0.9
-float kd = 0.002; // 0.002
-float ki = 0.015; // 0.0
+float kp = 2.3;   // 0.9
+float kd = 0.015; // 0.002
+float ki = 0.2;   // 0.0
 
 float eM1 = 0;
 float eM2 = 0;
@@ -122,19 +121,11 @@ void setup()
       ;
   }
   Serial.println("Motor Shield found.");
-
-  FR->setSpeed(pwmM1);
-  FR->run(FORWARD);
-  RR->setSpeed(pwmM2);
-  RR->run(FORWARD);
-  FL->setSpeed(pwmM3);
-  FR->run(FORWARD);
-  RL->setSpeed(pwmM4);
-  RL->run(FORWARD);
 }
 
 void loop()
 {
+  // Serial.println(digitalRead(switchPin));
   if (timeExceeded)
   {
     Serial.println(startRunTime - previousRunTime);
@@ -145,22 +136,59 @@ void loop()
     {
       startRunTime = millis();
     }
-    if (!systemActive)
+    delay(1000);
+    if (digitalRead(switchPin) == HIGH)
     {
-      startSystem();
-      systemActive = true;
-      addTask('F', 50, 40, false, 0);
-    }
-    processTasks();
-    if (resetSequence)
-    {
-      while (!taskQueue.empty())
+      if (!systemActive)
       {
-        taskQueue.erase(taskQueue.begin());
+        while (!taskQueue.empty())
+        {
+          taskQueue.erase(taskQueue.begin());
+        }
+        startSystem();
+        systemActive = true;
+
+        // addTask('R', 50, 70, false, 0);
+
+        // addTask('F', 100, 70, false, 0);
+        // addTask('T', 90, 70, false, 0);
+        // addTask('F', 80, 70, false, 0);
+        // addTask('L', 90, 70, false, 0);
+
+        // addTask('F', 100, 70, false, 0);
+        // addTask('B', 100, 70, false, 0);
+        // addTask('F', 50, 70, false, 0);
+        // addTask('L', 50, 70, false, 0);
+        // addTask('R', 100, 70, false, 0);
+        // addTask('L', 50, 70, false, 0);
+        // addTask('T', 90, 50, false, 0);
+        // addTask('T', -180, 50, false, 0);
+
+        addTask('R', 160, 70, false, 0);
+        addTask('T', 65, 50, false, 0);
+        addTask('F', 170, 50, true, 50);
+        addTask('T', 35, 50, false, 0);
+        addTask('R', 150, 70, true, 10);
+
+        // addTask('T', 90, 50, false, 0);
+        // addTask('T', -180, 50, false, 0);
+
+        // while (!taskQueue.empty()) {
+        //   Serial.println(taskQueue.front().type);
+        //   taskQueue.erase(taskQueue.begin());
+        // }
       }
-      resetSequence = false;
-      systemActive = false;
-      unsigned long startRunTime = 0;
+      processTasks();
+      if (resetSequence)
+      {
+        while (!taskQueue.empty())
+        {
+          taskQueue.erase(taskQueue.begin());
+        }
+        resetSequence = false;
+        systemActive = false;
+        unsigned long startRunTime = 0;
+      }
     }
   }
   else
@@ -410,14 +438,20 @@ void moveRobot(float value, float speed, char type, bool callibFlag)
     float degreesPerCm = 360 / rotationCircumference;
     float distanceCm = value / degreesPerCm;
 
-    float countsPerCm = 520.0 / c; // encoder counts per cm based on your setup
+    float countsPerCm = 800.0 / c; // encoder counts per cm based on your setup
     targetCounts = floor(abs(distanceCm * countsPerCm));
   }
   else
   {
     float c = 18.85;
-    float countsPerCm = 520.0 / c; // encoder counts per cm based on your setup
+    float countsPerCm = 780 / c;
+
+    if (type == 'F' || type == 'B')
+    {
+      countsPerCm = 650 / c;
+    }
     targetCounts = floor(value * countsPerCm);
+    Serial.println(targetCounts);
   }
 
   // Reset encoder positions
@@ -432,6 +466,7 @@ void moveRobot(float value, float speed, char type, bool callibFlag)
   // applyMotorSpeeds();
 
   bool obstacleDetected = false;
+  int prevPosition = 0;
 
   // Start the movement
   while (true)
@@ -439,6 +474,7 @@ void moveRobot(float value, float speed, char type, bool callibFlag)
     unsigned long currentRunTime = millis();
     if (currentRunTime - startRunTime >= maxRunTime)
     {
+      Serial.println("time up bro");
       stop();
       timeExceeded = true;
       break;
@@ -454,11 +490,21 @@ void moveRobot(float value, float speed, char type, bool callibFlag)
 
     int effectivePosition = calculateEffectivePosition(posM1, posM2, posM3, posM4, type);
 
+    // Serial.println(effectivePosition);
     // Check for obstacles based on the direction of movement
     if (!callibFlag)
     {
       obstacleDetected = checkForObstacles(type);
     }
+    else
+    {
+      obstacleDetected = false;
+      // if ( prevPosition == effectivePosition && prevPosition != 0) {
+      //     break;
+      // }
+    }
+
+    prevPosition = effectivePosition;
 
     if (obstacleDetected)
     {
@@ -493,6 +539,7 @@ void moveRobot(float value, float speed, char type, bool callibFlag)
   distM2 = 0;
   distM3 = 0;
   distM4 = 0;
+  delay(100);
 }
 
 bool checkForObstacles(char direction)
@@ -511,6 +558,16 @@ bool checkForObstacles(char direction)
   case 'R':
     // Serial.println(digitalRead(RIGHT_SENSOR_PIN));
     return digitalRead(RIGHT_SENSOR_PIN) == HIGH;
+  // case 'T':
+  //     if (digitalRead(FRONT_SENSOR_PIN) == HIGH) {
+  //       return true;
+  //     } else if (digitalRead(BACK_SENSOR_PIN) == HIGH) {
+  //       return true;
+  //     } else if (digitalRead(LEFT_SENSOR_PIN) == HIGH) {
+  //       return true;
+  //     } else if (digitalRead(RIGHT_SENSOR_PIN) == HIGH) {
+  //       return true;
+  //     }
   default:
     return false;
   }
@@ -522,15 +579,15 @@ void setMotorSpeedsBasedOnDirection(float speed, char direction, float degrees)
   {
   case 'F':
     m1Speed = -speed;
-    m2Speed = speed;
+    m2Speed = -speed;
     m3Speed = speed;
-    m4Speed = -speed;
+    m4Speed = speed;
     break;
   case 'B':
     m1Speed = speed;
-    m2Speed = -speed;
+    m2Speed = speed;
     m3Speed = -speed;
-    m4Speed = speed;
+    m4Speed = -speed;
     break;
   case 'L':
     m1Speed = -speed;
@@ -547,15 +604,15 @@ void setMotorSpeedsBasedOnDirection(float speed, char direction, float degrees)
   case 'T':
     if (degrees > 0)
     { // Clockwise
-      m1Speed = speed;
-      m2Speed = -speed;
+      m1Speed = -speed;
+      m2Speed = speed;
       m3Speed = -speed;
       m4Speed = speed;
     }
     else
     { // Counterclockwise
-      m1Speed = -speed;
-      m2Speed = speed;
+      m1Speed = speed;
+      m2Speed = -speed;
       m3Speed = speed;
       m4Speed = -speed;
     }
@@ -581,7 +638,8 @@ int calculateEffectivePosition(int posM1, int posM2, int posM3, int posM4, char 
 
 void addTask(char type, float value, float speed, bool calibrationEnd, float calibrationRollbackDist)
 {
-  Task newTask = {type, value, speed, calibrationEnd, calibrationRollbackDist};
+  // Serial.println(calibrationRollbackDist);
+  Task newTask = {type, value, speed, calibrationRollbackDist, calibrationEnd};
   taskQueue.push_back(newTask);
 }
 
@@ -590,10 +648,13 @@ void processTasks()
   while (!taskQueue.empty())
   {
     Task currentTask = taskQueue.front();
+    Serial.println(currentTask.value);
+    Serial.println(currentTask.speed);
+    Serial.println(currentTask.type);
     if (currentTask.calibrationEnd)
     {
-      float calibDist = 5;
-      float calibSpeed = 20;
+      float calibDist = 30;
+      float calibSpeed = 50;
       char calibRollbackType;
       if (currentTask.type == 'F')
       {
@@ -611,13 +672,21 @@ void processTasks()
       {
         calibRollbackType = 'L';
       }
+      Serial.println(currentTask.value - calibDist);
       moveRobot(currentTask.value - calibDist, currentTask.speed, currentTask.type, false);
+      // Serial.println("Task done!");
       moveRobot(calibDist, calibSpeed, currentTask.type, true);
+      Serial.println("Calibrating...");
+      // Serial.println(calibRollbackType);
+      delay(50);
+      Serial.println(currentTask.calibrationRollbackDist);
       moveRobot(currentTask.calibrationRollbackDist, calibSpeed, calibRollbackType, true);
+      Serial.println("Task done!");
     }
     else
     {
       moveRobot(currentTask.value, currentTask.speed, currentTask.type, false);
+      Serial.println("Task done!");
     }
 
     taskQueue.erase(taskQueue.begin()); // Remove the task from the queue once completed
