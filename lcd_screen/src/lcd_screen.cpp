@@ -144,6 +144,161 @@ int main() {
         
     // }
 #endif
+    const uint left_button = 0;
+    const uint right_button = 2;
+    const uint middle_button = 1;
+    const uint color_pin = 10;
+    const uint pos_pin1 = 11;
+    const uint pos_pin2 = 12;
+
+    gpio_init(PICO_DEFAULT_LED_PIN);
+    gpio_init(left_button);
+    gpio_init(right_button);
+    gpio_init(middle_button);
+    gpio_init(color_pin);
+    gpio_init(pos_pin1);
+    gpio_init(pos_pin2);
+
+    gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
+    gpio_set_dir(left_button, GPIO_IN);
+    gpio_set_dir(right_button, GPIO_IN);
+    gpio_set_dir(middle_button, GPIO_IN);
+    gpio_set_dir(color_pin, GPIO_OUT);
+    gpio_set_dir(pos_pin1, GPIO_OUT);
+    gpio_set_dir(pos_pin2, GPIO_OUT);
+
+    bool display_menu = false;
+    bool menu_selected = false;
+    bool blue_selected = false;
+    gpio_pull_up(left_button);
+    gpio_pull_up(middle_button);
+    gpio_pull_up(right_button);
+    int score= 0;
+    while (true) {
+        if(!gpio_get(middle_button)) {
+        display_menu = true;
+    }
+    if (!gpio_get(left_button)) {
+        while(!gpio_get(left_button)==1);
+            score = score +5 ;
+            lcd_clear();
+            lcd_set_cursor(0, 0);
+            lcd_string("CYBERBEETLE");
+            lcd_set_cursor(1, 0);
+            lcd_string("Score: ");
+            char score_str[10];
+            sprintf(score_str, "%d", score);
+            lcd_string(score_str);
+            while(!gpio_get(left_button) == 1);
+
+            }
+        if (!gpio_get(right_button)) {
+            while(!gpio_get(right_button)==1);
+            score-=1;
+            lcd_clear();
+            lcd_set_cursor(0, 0);
+            lcd_string("CYBERBEETLE");
+            lcd_set_cursor(1, 0);
+            lcd_string("Score: ");
+            char score_str[10];
+            sprintf(score_str, "%d", score);
+            lcd_string(score_str);
+            
+            while(!gpio_get(right_button) == 1);
+            }
+    if(display_menu) {
+        score = 0;
+        lcd_clear();
+        lcd_set_cursor(0, 0);
+        lcd_string("Menu:");
+        lcd_set_cursor(1, 0);
+        lcd_string("1. Blue");
+        lcd_set_cursor(1, 9);
+        lcd_string("2. Yellow");
+
+        // Reset flags
+        menu_selected = false;
+        blue_selected = false;
+
+        // Reset pins
+        gpio_put(color_pin, 0);
+        gpio_put(pos_pin1, 0);
+        gpio_put(pos_pin2, 0);
+
+        // Wait for button release
+        while(!gpio_get(middle_button) == 1);
+
+        while (!menu_selected) {
+            if (!gpio_get(left_button)) {
+                blue_selected = true;
+                menu_selected = true;
+                gpio_put(color_pin, 1);
+
+            }
+
+            if (!gpio_get(right_button)) {
+                blue_selected = false;
+                menu_selected = true;
+                gpio_put(color_pin, 0);
+            }
+        }
+        if (blue_selected) {
+            lcd_clear();
+            lcd_set_cursor(0, 0);
+            lcd_string("You chose:");
+            lcd_set_cursor(1, 0);
+            lcd_string("Blue");
+        } else {
+            lcd_clear();
+            lcd_set_cursor(0, 0);
+            lcd_string("You chose:");
+            lcd_set_cursor(1, 0);
+            lcd_string("Yellow");
+        }
+        sleep_ms(2000);
+        // Second menu
+        lcd_clear();;
+        lcd_set_cursor(0, 0);
+        lcd_string("Second Menu:");
+        lcd_set_cursor(1, 0);
+        lcd_string("1.L");
+
+        lcd_set_cursor(1, 7);
+
+        lcd_string("2.M");
+        lcd_set_cursor(1, 13);
+
+        lcd_string("3.R");
+        // Reset flags
+        bool position_selected = false;
+        bool left_selected = false;
+        bool right_selected = false;
+        bool middle_selected = false;
+        // Wait for button release
+        
+        // Display the selected option
+        lcd_clear();
+        
+        blink_led(100, PICO_DEFAULT_LED_PIN);
+        // Add a delay before going back to default display
+        sleep_ms(1000);
+        // Clear LCD and go back to default display
+        lcd_clear();
+        lcd_set_cursor(0, 0);
+        lcd_string("CYBERBEETLE");
+        lcd_set_cursor(1, 0);
+        lcd_string("Score: ");
+        // Convert the score to a string
+        char score_str[10];
+        sprintf(score_str, "%d", score);
+        // Write the score on the screen
+        lcd_string(score_str);
+
+        display_menu = false;
+        }
+        
+        
+    }
 
     
     
