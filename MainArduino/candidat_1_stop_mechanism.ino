@@ -80,13 +80,13 @@ unsigned long currentTime = 0;
 unsigned long prevTimePID = 0;
 unsigned long currentTimePID = 0;
 
-// float kp = 2.3; //0.9
-// float kd = 0.015;//0.002
-// float ki = 0.2;//0.0
+float kp = 2.3;   // 0.9
+float kd = 0.015; // 0.002
+float ki = 0.2;   // 0.0
 
-float kp = 0.5;   // 0.9
-float kd = 0.001; // 0.002
-float ki = 0.002; // 0.0
+// float kp = 0.5; //0.9
+// float kd = 0.001;//0.002
+// float ki = 0.002;//0.0
 
 float eM1 = 0;
 float eM2 = 0;
@@ -174,16 +174,26 @@ void loop()
         startSystem();
         systemActive = true;
 
-        // addTask('R', 50, 70, false, 0, false);
+        // JAUNE
+        //  addTask('L', 46, 70, false, 0, false);//70
+        //  addTask('F', 90, 40, false, 0, false);//135
+        //  addTask('R', 40, 70, false, 0, false);//55
+        //  addTask('B', 15, 40, false, 0, false);
 
-        addTask('L', 10, 40, false, 0, true);
-        delay(1000);
-        addTask('R', 50, 70, false, 0, false);
+        // BLEU
+        addTask('R', 46, 70, false, 0, false); // 70
+        addTask('F', 90, 40, false, 0, false); // 135
+        addTask('L', 40, 70, false, 0, false); // 55
+        addTask('B', 15, 40, false, 0, false);
 
-        // addTask('F', 50, 70, false, 0, false);
-        // addTask('L', 50, 70, false, 0, false);
-        // addTask('R', 50, 70, false, 0, false);
-        // addTask('T', 180, 50, false, 0, false);
+        // TEST DEVIATION
+        // addTask('F', 150, 70, false, 0, false);
+
+        //  addTask('B', 10, 30, false, 0, false);
+        //  addTask('L', 10, 70, false, 0, false);
+        //  addTask('F', 80, 70, false, 0, false);
+        //  addTask('R', 50, 70, false, 0, false);
+        //  addTask('T', 180, 50, false, 0, false);
 
         // addTask('F', 100, 70, false, 0, false);
         // addTask('B', 100, 70, false, 0, false);
@@ -265,8 +275,8 @@ void moveRobot(float value, float speed, char type, bool callibFlag, bool initia
   {
     targetCounts = floor(value * calibratedCountsPerCmRL);
   }
+  Serial.print("targetCounts: ");
   Serial.println(targetCounts);
-
   // Reset encoder positions
   posiM1 = 0;
   posiM2 = 0;
@@ -294,6 +304,12 @@ void moveRobot(float value, float speed, char type, bool callibFlag, bool initia
       break;
     }
     int posM1, posM2, posM3, posM4;
+
+    Serial.println(distM1);
+    Serial.println(distM2);
+    Serial.println(distM3);
+    Serial.println(distM4);
+
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
     {
       posM1 = distM1;
@@ -304,7 +320,9 @@ void moveRobot(float value, float speed, char type, bool callibFlag, bool initia
 
     int effectivePosition = calculateEffectivePosition(posM1, posM2, posM3, posM4, type);
 
+    Serial.print("effectivePosition: ");
     Serial.println(effectivePosition);
+
     // Check for obstacles based on the direction of movement
     if (!callibFlag)
     {
@@ -405,16 +423,20 @@ bool checkForObstacles(char direction)
   switch (direction)
   {
   case 'F':
-    // Serial.println(digitalRead(FRONT_SENSOR_PIN));
+    Serial.print("Obstacle front: ");
+    Serial.println(digitalRead(FRONT_SENSOR_PIN));
     return digitalRead(FRONT_SENSOR_PIN) == HIGH;
   case 'B':
-    // Serial.println(digitalRead(BACK_SENSOR_PIN));
+    Serial.print("Obstacle back: ");
+    Serial.println(digitalRead(BACK_SENSOR_PIN));
     return digitalRead(BACK_SENSOR_PIN) == HIGH;
   case 'L':
-    // Serial.println(digitalRead(LEFT_SENSOR_PIN));
+    Serial.print("Obstacle left: ");
+    Serial.println(digitalRead(LEFT_SENSOR_PIN));
     return digitalRead(LEFT_SENSOR_PIN) == HIGH;
   case 'R':
-    // Serial.println(digitalRead(RIGHT_SENSOR_PIN));
+    Serial.print("Obstacle right: ");
+    Serial.println(digitalRead(RIGHT_SENSOR_PIN));
     return digitalRead(RIGHT_SENSOR_PIN) == HIGH;
   // case 'T':
   //     if (digitalRead(FRONT_SENSOR_PIN) == HIGH) {
@@ -438,7 +460,7 @@ void setMotorSpeedsBasedOnDirection(float speed, char direction, float degrees)
   case 'F':
     m1Speed = -speed;
     m2Speed = -speed;
-    m3Speed = speed;
+    m3Speed = speed; // 1.1
     m4Speed = speed;
     break;
   case 'B':
@@ -506,8 +528,11 @@ void processTasks()
   while (!taskQueue.empty())
   {
     Task currentTask = taskQueue.front();
+    Serial.print("currentTask.value: ");
     Serial.println(currentTask.value);
+    Serial.print("currentTask.speed: ");
     Serial.println(currentTask.speed);
+    Serial.print("currentTask.type: ");
     Serial.println(currentTask.type);
     if (currentTask.calibrationEnd)
     {
@@ -630,10 +655,10 @@ void calculateWheelSpeeds()
   float wheelSpeedCmS_RL = linearX + linearY - angularVelocityCmS;
   float wheelSpeedCmS_RR = linearX - linearY - angularVelocityCmS;
 
-  // Serial.println(wheelSpeedCmS_FL);
-  // Serial.println(wheelSpeedCmS_FR);
-  // Serial.println(wheelSpeedCmS_RL);
-  // Serial.println(wheelSpeedCmS_RR);
+  //  Serial.println(wheelSpeedCmS_FL);
+  //  Serial.println(wheelSpeedCmS_FR);
+  //  Serial.println(wheelSpeedCmS_RL);
+  //  Serial.println(wheelSpeedCmS_RR);
 
   m1Speed = (wheelSpeedCmS_FR * 60) / c;
   m2Speed = (wheelSpeedCmS_RR * 60) / c;
