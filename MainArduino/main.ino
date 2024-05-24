@@ -62,7 +62,6 @@ volatile int distM2 = 0;
 volatile int distM3 = 0;
 volatile int distM4 = 0;
 
-// Filter parameters and variables
 #define WINDOW_SIZE 5 // Size of the moving average window
 volatile int encoderReadingsM1[WINDOW_SIZE] = {0};
 volatile int encoderReadingsM2[WINDOW_SIZE] = {0};
@@ -84,10 +83,6 @@ unsigned long currentTimePID = 0;
 float kp = 2.3;   // 0.9
 float kd = 0.015; // 0.002
 float ki = 0.2;   // 0.0
-
-// float kp = 0.5; //0.9
-// float kd = 0.001;//0.002
-// float ki = 0.002;//0.0
 
 float eM1 = 0;
 float eM2 = 0;
@@ -142,7 +137,6 @@ void setup()
 
   if (!AFMS.begin())
   { // create with the default frequency 1.6KHz
-    // if (!AFMS.begin(1000)) {  // OR with a different frequency, say 1KHz
     Serial.println("Could not find Motor Shield. Check wiring.");
     while (1)
       ;
@@ -152,7 +146,6 @@ void setup()
 
 void loop()
 {
-  // Serial.println(digitalRead(switchPin));
   if (timeExceeded)
   {
     Serial.println(startRunTime - previousRunTime);
@@ -175,49 +168,10 @@ void loop()
         startSystem();
         systemActive = true;
 
-        // JAUNE
-        //  addTask('L', 46, 70, false, 0, false);//70
-        //  addTask('F', 90, 40, false, 0, false);//135
-        //  addTask('R', 40, 70, false, 0, false);//55
-        //  addTask('B', 15, 40, false, 0, false);
-
-        // BLEU
         addTask('R', 46, 70, false, 0, false); // 70
         addTask('F', 90, 40, false, 0, false); // 135
         addTask('L', 40, 70, false, 0, false); // 55
         addTask('B', 15, 40, false, 0, false);
-
-        // TEST DEVIATION
-        // addTask('F', 150, 70, false, 0, false);
-
-        //  addTask('B', 10, 30, false, 0, false);
-        //  addTask('L', 10, 70, false, 0, false);
-        //  addTask('F', 80, 70, false, 0, false);
-        //  addTask('R', 50, 70, false, 0, false);
-        //  addTask('T', 180, 50, false, 0, false);
-
-        // addTask('F', 100, 70, false, 0, false);
-        // addTask('B', 100, 70, false, 0, false);
-        // addTask('F', 50, 70, false, 0, false);
-        // addTask('L', 50, 70, false, 0, false);
-        // addTask('R', 100, 70, false, 0, false);
-        // addTask('L', 50, 70, false, 0, false);
-        // addTask('T', 90, 50, false, 0, false);
-        // addTask('T', -180, 50, false, 0, false);
-
-        // addTask('R', 160, 70, false, 0, false);
-        // addTask('T', 65, 50, false, 0, false);
-        // addTask('F', 170, 50, true, 50, false);
-        // addTask('T', 35, 50, false, 0, false);
-        // addTask('R', 150, 70, true, 10, false);
-
-        // addTask('T', 90, 50, false, 0);
-        // addTask('T', -180, 50, false, 0);
-
-        // while (!taskQueue.empty()) {
-        //   Serial.println(taskQueue.front().type);
-        //   taskQueue.erase(taskQueue.begin());
-        // }
       }
       processTasks();
       if (resetSequence)
@@ -247,27 +201,23 @@ void startSystem()
   Serial.println("System Starting...");
 }
 
-// Function to move the robot in a specified direction for a certain distance
 void moveRobot(float value, float speed, char type, bool callibFlag, bool initialCallibFlag)
 {
   int targetCounts = calculateTargetCounts(value, getCalibratedCountsPerCm(type), type);
   Serial.print("targetCounts: ");
   Serial.println(targetCounts);
 
-  // Reset encoder positions
   posiM1 = 0;
   posiM2 = 0;
   posiM3 = 0;
   posiM4 = 0;
 
-  // Set speeds depending on the direction
   setMotorSpeedsBasedOnDirection(speed, type, value);
 
   bool obstacleDetected = false;
   int prevPosition = 0;
   int similarPosCount = 0;
 
-  // Start the movement
   while (true)
   {
     unsigned long currentRunTime = millis();
@@ -298,7 +248,6 @@ void moveRobot(float value, float speed, char type, bool callibFlag, bool initia
     Serial.print("effectivePosition: ");
     Serial.println(effectivePosition);
 
-    // Check for obstacles based on the direction of movement
     if (!callibFlag)
     {
       obstacleDetected = checkForObstacles(type);
@@ -360,7 +309,6 @@ void moveRobot(float value, float speed, char type, bool callibFlag, bool initia
     if (obstacleDetected)
     {
       stop();
-      // Serial.println("Stopping");
     }
     else
     {
@@ -370,13 +318,11 @@ void moveRobot(float value, float speed, char type, bool callibFlag, bool initia
         break;
       }
 
-      // Check if the target position is reached or exceeded
       if (effectivePosition >= targetCounts)
       {
         break;
       }
 
-      // Continue updating PID and motor speeds
       computeSpeed();
       computePower();
       applyMotorSpeeds();
@@ -391,31 +337,6 @@ void moveRobot(float value, float speed, char type, bool callibFlag, bool initia
   distM3 = 0;
   distM4 = 0;
   delay(200);
-}
-
-bool checkForObstacles(char direction)
-{
-  switch (direction)
-  {
-  case 'F':
-    Serial.print("Obstacle front: ");
-    Serial.println(digitalRead(FRONT_SENSOR_PIN));
-    return digitalRead(FRONT_SENSOR_PIN) == HIGH;
-  case 'B':
-    Serial.print("Obstacle back: ");
-    Serial.println(digitalRead(BACK_SENSOR_PIN));
-    return digitalRead(BACK_SENSOR_PIN) == HIGH;
-  case 'L':
-    Serial.print("Obstacle left: ");
-    Serial.println(digitalRead(LEFT_SENSOR_PIN));
-    return digitalRead(LEFT_SENSOR_PIN) == HIGH;
-  case 'R':
-    Serial.print("Obstacle right: ");
-    Serial.println(digitalRead(RIGHT_SENSOR_PIN));
-    return digitalRead(RIGHT_SENSOR_PIN) == HIGH;
-  default:
-    return false;
-  }
 }
 
 void setMotorSpeedsBasedOnDirection(float speed, char direction, float degrees)
@@ -464,23 +385,6 @@ void setMotorSpeedsBasedOnDirection(float speed, char direction, float degrees)
   }
 }
 
-int calculateEffectivePosition(int posM1, int posM2, int posM3, int posM4, char direction)
-{
-  // Depending on direction, modify how the effective position is calculated
-  switch (direction)
-  {
-  case 'F':
-  case 'B':
-  case 'T':
-    return (abs(posM1) + abs(posM2) + abs(posM3) + abs(posM4)) / 4;
-  case 'L':
-  case 'R':
-    return (abs(posM1) + abs(posM2) + abs(posM3) + abs(posM4)) / 4; // For lateral movements
-  default:
-    return 0;
-  }
-}
-
 void addTask(char type, float value, float speed, bool calibrationEnd, float calibrationRollbackDist, bool initialCallib)
 {
   Task newTask = {type, value, speed, calibrationRollbackDist, calibrationEnd, initialCallib};
@@ -521,7 +425,6 @@ void processTasks()
       }
       Serial.println(currentTask.value - calibDist);
       moveRobot(currentTask.value - calibDist, currentTask.speed, currentTask.type, false, false);
-      // Serial.println("Task done!");
       moveRobot(calibDist, calibSpeed, currentTask.type, true, false);
       Serial.println("Calibrating...");
       delay(50);
@@ -546,172 +449,6 @@ void processTasks()
   {
     trajFinished = true;
   }
-}
-
-// Encoder read functions with filters
-void readEncoderM1()
-{
-  sumM1 -= encoderReadingsM1[indexM1];
-  encoderReadingsM1[indexM1] = 1; // Increment by 1 for each pulse
-  sumM1 += encoderReadingsM1[indexM1];
-  indexM1 = (indexM1 + 1) % WINDOW_SIZE;
-  if (countM1 < WINDOW_SIZE)
-  {
-    countM1++;
-  }
-  posiM1 = sumM1 / countM1;
-  distM1 += sumM1 / countM1;
-}
-
-void readEncoderM2()
-{
-  sumM2 -= encoderReadingsM2[indexM2];
-  encoderReadingsM2[indexM2] = 1;
-  sumM2 += encoderReadingsM2[indexM2];
-  indexM2 = (indexM2 + 1) % WINDOW_SIZE;
-  if (countM2 < WINDOW_SIZE)
-  {
-    countM2++;
-  }
-  posiM2 = sumM2 / countM2;
-  distM2 += sumM2 / countM2;
-}
-
-void readEncoderM3()
-{
-  sumM3 -= encoderReadingsM3[indexM3];
-  encoderReadingsM3[indexM3] = 1;
-  sumM3 += encoderReadingsM3[indexM3];
-  indexM3 = (indexM3 + 1) % WINDOW_SIZE;
-  if (countM3 < WINDOW_SIZE)
-  {
-    countM3++;
-  }
-  posiM3 = sumM3 / countM3;
-  distM3 += sumM3 / countM3;
-}
-
-void readEncoderM4()
-{
-  sumM4 -= encoderReadingsM4[indexM4];
-  encoderReadingsM4[indexM4] = 1;
-  sumM4 += encoderReadingsM4[indexM4];
-  indexM4 = (indexM4 + 1) % WINDOW_SIZE;
-  if (countM4 < WINDOW_SIZE)
-  {
-    countM4++;
-  }
-  posiM4 = sumM4 / countM4;
-  distM4 += sumM4 / countM4;
-}
-
-void calculateWheelSpeeds()
-{
-  float c = 18.85;
-  float Length = 23.0;
-  float Width = 23.0;
-
-  float angularVelocityCmS = angularZ * ((Length + Width) / 2.0);
-
-  float wheelSpeedCmS_FL = linearX - linearY + angularVelocityCmS;
-  float wheelSpeedCmS_FR = linearX + linearY + angularVelocityCmS;
-  float wheelSpeedCmS_RL = linearX + linearY - angularVelocityCmS;
-  float wheelSpeedCmS_RR = linearX - linearY - angularVelocityCmS;
-
-  m1Speed = (wheelSpeedCmS_FR * 60) / c;
-  m2Speed = (wheelSpeedCmS_RR * 60) / c;
-  m3Speed = (wheelSpeedCmS_FL * 60) / c;
-  m4Speed = (wheelSpeedCmS_RL * 60) / c;
-}
-
-void computeSpeed()
-{
-  int posM1, posM2, posM3, posM4;
-  currentTime = millis();
-  unsigned long timeDiff = currentTime - prevTime;
-  ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
-  {
-    posM1 = posiM1;
-    posM2 = posiM2;
-    posM3 = posiM3;
-    posM4 = posiM4;
-  }
-
-  rpmM1 = (posM1 / 800.0) * (60000.0 / timeDiff);
-  rpmM2 = (posM2 / 800.0) * (60000.0 / timeDiff);
-  rpmM3 = (posM3 / 800.0) * (60000.0 / timeDiff);
-  rpmM4 = (posM4 / 800.0) * (60000.0 / timeDiff);
-
-  prevTime = currentTime;
-  posiM1 = 0;
-  posiM2 = 0;
-  posiM3 = 0;
-  posiM4 = 0;
-}
-
-void computePower()
-{
-  currentTimePID = millis();
-  unsigned long timeDiffPID = currentTimePID - prevTimePID;
-
-  eM1 = m1Speed - rpmM1;
-  eM2 = m2Speed - rpmM2;
-  eM3 = m3Speed - rpmM3;
-  eM4 = m4Speed - rpmM4;
-
-  float dedtM1 = (eM1 - prevEM1) / (timeDiffPID);
-  float dedtM2 = (eM2 - prevEM2) / (timeDiffPID);
-  float dedtM3 = (eM3 - prevEM3) / (timeDiffPID);
-  float dedtM4 = (eM4 - prevEM4) / (timeDiffPID);
-
-  eIntegralM1 = eIntegralM1 + eM1 * timeDiffPID;
-  eIntegralM2 = eIntegralM2 + eM2 * timeDiffPID;
-  eIntegralM3 = eIntegralM3 + eM3 * timeDiffPID;
-  eIntegralM4 = eIntegralM4 + eM4 * timeDiffPID;
-
-  pwmM1 = kp * eM1 + kd * dedtM1 + ki * eIntegralM1;
-  pwmM2 = kp * eM2 + kd * dedtM2 + ki * eIntegralM2;
-  pwmM3 = kp * eM3 + kd * dedtM3 + ki * eIntegralM3;
-  pwmM4 = kp * eM4 + kd * dedtM4 + ki * eIntegralM4;
-
-  if (pwmM1 > 255)
-  {
-    pwmM1 = 255;
-  }
-  if (pwmM1 < 0)
-  {
-    pwmM1 = 0;
-  }
-  if (pwmM2 < 0)
-  {
-    pwmM2 = 0;
-  }
-  if (pwmM2 > 255)
-  {
-    pwmM2 = 255;
-  }
-  if (pwmM3 < 0)
-  {
-    pwmM3 = 0;
-  }
-  if (pwmM3 > 255)
-  {
-    pwmM3 = 255;
-  }
-  if (pwmM4 < 0)
-  {
-    pwmM4 = 0;
-  }
-  if (pwmM4 > 255)
-  {
-    pwmM4 = 255;
-  }
-
-  prevEM1 = eM1;
-  prevEM2 = eM2;
-  prevEM3 = eM3;
-  prevEM4 = eM4;
-  prevTimePID = currentTimePID;
 }
 
 void applyMotorSpeeds()
@@ -769,18 +506,58 @@ void stop()
   RR->run(RELEASE);
 }
 
-float getCalibratedCountsPerCm(char type)
+void readEncoderM1()
 {
-  if (type == 'F' || type == 'B')
+  sumM1 -= encoderReadingsM1[indexM1];
+  encoderReadingsM1[indexM1] = 1; // Increment by 1 for each pulse
+  sumM1 += encoderReadingsM1[indexM1];
+  indexM1 = (indexM1 + 1) % WINDOW_SIZE;
+  if (countM1 < WINDOW_SIZE)
   {
-    return calibratedCountsPerCmFB;
+    countM1++;
   }
-  else if (type == 'L' || type == 'R')
+  posiM1 = sumM1 / countM1;
+  distM1 += sumM1 / countM1;
+}
+
+void readEncoderM2()
+{
+  sumM2 -= encoderReadingsM2[indexM2];
+  encoderReadingsM2[indexM2] = 1;
+  sumM2 += encoderReadingsM2[indexM2];
+  indexM2 = (indexM2 + 1) % WINDOW_SIZE;
+  if (countM2 < WINDOW_SIZE)
   {
-    return calibratedCountsPerCmRL;
+    countM2++;
   }
-  else
+  posiM2 = sumM2 / countM2;
+  distM2 += sumM2 / countM2;
+}
+
+void readEncoderM3()
+{
+  sumM3 -= encoderReadingsM3[indexM3];
+  encoderReadingsM3[indexM3] = 1;
+  sumM3 += encoderReadingsM3[indexM3];
+  indexM3 = (indexM3 + 1) % WINDOW_SIZE;
+  if (countM3 < WINDOW_SIZE)
   {
-    return calibratedCountsPerCmT;
+    countM3++;
   }
+  posiM3 = sumM3 / countM3;
+  distM3 += sumM3 / countM3;
+}
+
+void readEncoderM4()
+{
+  sumM4 -= encoderReadingsM4[indexM4];
+  encoderReadingsM4[indexM4] = 1;
+  sumM4 += encoderReadingsM4[indexM4];
+  indexM4 = (indexM4 + 1) % WINDOW_SIZE;
+  if (countM4 < WINDOW_SIZE)
+  {
+    countM4++;
+  }
+  posiM4 = sumM4 / countM4;
+  distM4 += sumM4 / countM4;
 }
