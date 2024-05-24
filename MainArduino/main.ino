@@ -1,4 +1,4 @@
-#include <util/atomic.h> // For the ATOMIC_BLOCK macro
+#include <util/atomic.h>
 #include <Adafruit_MotorShield.h>
 #include <PinChangeInterrupt.h>
 #include <ArxContainer.h>
@@ -137,18 +137,18 @@ void setup()
 
   if (!AFMS.begin())
   { // create with the default frequency 1.6KHz
-    Serial.println("Could not find Motor Shield. Check wiring.");
+    Serial.println("{\"event\":\"motor_shield_init\",\"status\":\"error\",\"message\":\"Could not find Motor Shield. Check wiring.\"}");
     while (1)
       ;
   }
-  Serial.println("Motor Shield found.");
+  Serial.println("{\"event\":\"motor_shield_init\",\"status\":\"success\",\"message\":\"Motor Shield found.\"}");
 }
 
 void loop()
 {
   if (timeExceeded)
   {
-    Serial.println(startRunTime - previousRunTime);
+    Serial.printf("{\"event\":\"time_exceeded\",\"time_exceeded\":%lu}\n", startRunTime - previousRunTime);
   }
   else if (digitalRead(switchPin) == HIGH)
   {
@@ -167,12 +167,45 @@ void loop()
         }
         startSystem();
         systemActive = true;
+        // JAUNE
+        //  addTask('L', 46, 70, false, 0, false);//70
+        //  addTask('F', 90, 40, false, 0, false);//135
+        //  addTask('R', 40, 70, false, 0, false);//55
+        //  addTask('B', 15, 40, false, 0, false);
 
+        // BLEU
         addTask('R', 46, 70, false, 0, false); // 70
         addTask('F', 90, 40, false, 0, false); // 135
         addTask('L', 40, 70, false, 0, false); // 55
         addTask('B', 15, 40, false, 0, false);
-      }
+
+        // TEST DEVIATION
+        // addTask('F', 150, 70, false, 0, false);
+
+        //  addTask('B', 10, 30, false, 0, false);
+        //  addTask('L', 10, 70, false, 0, false);
+        //  addTask('F', 80, 70, false, 0, false);
+        //  addTask('R', 50, 70, false, 0, false);
+        //  addTask('T', 180, 50, false, 0, false);
+
+        // addTask('F', 100, 70, false, 0, false);
+        // addTask('B', 100, 70, false, 0, false);
+        // addTask('F', 50, 70, false, 0, false);
+        // addTask('L', 50, 70, false, 0, false);
+        // addTask('R', 100, 70, false, 0, false);
+        // addTask('L', 50, 70, false, 0, false);
+        // addTask('T', 90, 50, false, 0, false);
+        // addTask('T', -180, 50, false, 0, false);
+
+        // addTask('R', 160, 70, false, 0, false);
+        // addTask('T', 65, 50, false, 0, false);
+        // addTask('F', 170, 50, true, 50, false);
+        // addTask('T', 35, 50, false, 0, false);
+        // addTask('R', 150, 70, true, 10, false);
+
+        // addTask('T', 90, 50, false, 0);
+        // addTask('T', -180, 50, false, 0);
+            }
       processTasks();
       if (resetSequence)
       {
@@ -193,19 +226,18 @@ void loop()
     resetSequence = false;
   }
 
-  delay(10); // General small delay to prevent looping too fast
+  delay(10);
 }
 
 void startSystem()
 {
-  Serial.println("System Starting...");
+  Serial.println("{\"event\":\"system_start\",\"message\":\"System Starting...\"}");
 }
 
 void moveRobot(float value, float speed, char type, bool callibFlag, bool initialCallibFlag)
 {
   int targetCounts = calculateTargetCounts(value, getCalibratedCountsPerCm(type), type);
-  Serial.print("targetCounts: ");
-  Serial.println(targetCounts);
+  Serial.printf("{\"event\":\"move_robot\",\"target_counts\":%d,\"type\":\"%c\"}\n", targetCounts, type);
 
   posiM1 = 0;
   posiM2 = 0;
@@ -223,17 +255,14 @@ void moveRobot(float value, float speed, char type, bool callibFlag, bool initia
     unsigned long currentRunTime = millis();
     if (currentRunTime - startRunTime >= maxRunTime)
     {
-      Serial.println("time up bro");
+      Serial.println("{\"event\":\"timeout\",\"message\":\"Time up, stopping the robot\"}");
       stop();
       timeExceeded = true;
       break;
     }
     int posM1, posM2, posM3, posM4;
 
-    Serial.println(distM1);
-    Serial.println(distM2);
-    Serial.println(distM3);
-    Serial.println(distM4);
+    Serial.printf("{\"event\":\"encoder_readings\",\"distM1\":%d,\"distM2\":%d,\"distM3\":%d,\"distM4\":%d}\n", distM1, distM2, distM3, distM4);
 
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
     {
@@ -244,9 +273,7 @@ void moveRobot(float value, float speed, char type, bool callibFlag, bool initia
     }
 
     int effectivePosition = calculateEffectivePosition(posM1, posM2, posM3, posM4, type);
-
-    Serial.print("effectivePosition: ");
-    Serial.println(effectivePosition);
+    Serial.printf("{\"event\":\"effective_position\",\"position\":%d}\n", effectivePosition);
 
     if (!callibFlag)
     {
@@ -269,13 +296,13 @@ void moveRobot(float value, float speed, char type, bool callibFlag, bool initia
       similarPosCount++;
       if (similarPosCount == 5)
       {
-        Serial.println("hello");
+        Serial.println("{\"event\":\"position_stable\",\"message\":\"Position is stable.\"}");
       }
     }
 
     if (initialCallibFlag)
     {
-      Serial.println("hello");
+      Serial.println("{\"event\":\"initial_calibration\",\"message\":\"Initial calibration in progress.\"}");
       if (prevPosition == effectivePosition && prevPosition != 0)
       {
         similarPosCount++;
@@ -291,11 +318,8 @@ void moveRobot(float value, float speed, char type, bool callibFlag, bool initia
             initialValue = initialCountsPerCmRL;
           }
           float newValue = (effectivePosition / 5) / c;
-          Serial.print("New value:");
-          Serial.println(newValue);
+          Serial.printf("{\"event\":\"calibration_update\",\"new_value\":%.2f,\"ratio\":%.2f}\n", newValue, newValue / initialValue);
           float ratio = newValue / initialValue;
-          Serial.print("Ratio:");
-          Serial.println(newValue);
           calibratedCountsPerCmFB = calibratedCountsPerCmFB * ratio;
           calibratedCountsPerCmRL = calibratedCountsPerCmRL * ratio;
           calibratedCountsPerCmT = calibratedCountsPerCmT * ratio;
@@ -309,6 +333,7 @@ void moveRobot(float value, float speed, char type, bool callibFlag, bool initia
     if (obstacleDetected)
     {
       stop();
+      Serial.println("{\"event\":\"obstacle_detected\",\"message\":\"Stopping due to obstacle.\"}");
     }
     else
     {
@@ -383,12 +408,14 @@ void setMotorSpeedsBasedOnDirection(float speed, char direction, float degrees)
       m4Speed = -speed;
     }
   }
+  Serial.printf("{\"event\":\"set_motor_speeds\",\"m1Speed\":%.2f,\"m2Speed\":%.2f,\"m3Speed\":%.2f,\"m4Speed\":%.2f}\n", m1Speed, m2Speed, m3Speed, m4Speed);
 }
 
 void addTask(char type, float value, float speed, bool calibrationEnd, float calibrationRollbackDist, bool initialCallib)
 {
   Task newTask = {type, value, speed, calibrationRollbackDist, calibrationEnd, initialCallib};
   taskQueue.push_back(newTask);
+  Serial.printf("{\"event\":\"add_task\",\"type\":\"%c\",\"value\":%.2f,\"speed\":%.2f,\"calibrationEnd\":%d,\"calibrationRollbackDist\":%.2f,\"initialCallib\":%d}\n", type, value, speed, calibrationEnd, calibrationRollbackDist, initialCallib);
 }
 
 void processTasks()
@@ -396,12 +423,7 @@ void processTasks()
   while (!taskQueue.empty())
   {
     Task currentTask = taskQueue.front();
-    Serial.print("currentTask.value: ");
-    Serial.println(currentTask.value);
-    Serial.print("currentTask.speed: ");
-    Serial.println(currentTask.speed);
-    Serial.print("currentTask.type: ");
-    Serial.println(currentTask.type);
+    Serial.printf("{\"event\":\"process_task\",\"type\":\"%c\",\"value\":%.2f,\"speed\":%.2f}\n", currentTask.type, currentTask.value, currentTask.speed);
     if (currentTask.calibrationEnd)
     {
       float calibDist = 30;
@@ -423,19 +445,19 @@ void processTasks()
       {
         calibRollbackType = 'L';
       }
-      Serial.println(currentTask.value - calibDist);
+      Serial.printf("{\"event\":\"calibration\",\"calibDist\":%.2f,\"calibSpeed\":%.2f,\"calibRollbackType\":\"%c\"}\n", calibDist, calibSpeed, calibRollbackType);
       moveRobot(currentTask.value - calibDist, currentTask.speed, currentTask.type, false, false);
       moveRobot(calibDist, calibSpeed, currentTask.type, true, false);
-      Serial.println("Calibrating...");
+      Serial.println("{\"event\":\"calibration\",\"message\":\"Calibrating...\"}");
       delay(50);
-      Serial.println(currentTask.calibrationRollbackDist);
+      Serial.printf("{\"event\":\"calibration\",\"calibrationRollbackDist\":%.2f}\n", currentTask.calibrationRollbackDist);
       moveRobot(currentTask.calibrationRollbackDist, calibSpeed, calibRollbackType, true, false);
-      Serial.println("Task done!");
+      Serial.println("{\"event\":\"task_done\",\"message\":\"Task done!\"}");
     }
     else
     {
       moveRobot(currentTask.value, currentTask.speed, currentTask.type, false, false);
-      Serial.println("Task done!");
+      Serial.println("{\"event\":\"task_done\",\"message\":\"Task done!\"}");
     }
 
     taskQueue.erase(taskQueue.begin()); // Remove the task from the queue once completed
@@ -496,6 +518,7 @@ void applyMotorSpeeds()
     RL->setSpeed(min(abs(m4Speed), 255));
     RL->run(BACKWARD);
   }
+  Serial.printf("{\"event\":\"apply_motor_speeds\",\"pwmM1\":%d,\"pwmM2\":%d,\"pwmM3\":%d,\"pwmM4\":%d}\n", pwmM1, pwmM2, pwmM3, pwmM4);
 }
 
 void stop()
@@ -504,6 +527,7 @@ void stop()
   FR->run(RELEASE);
   RL->run(RELEASE);
   RR->run(RELEASE);
+  Serial.println("{\"event\":\"stop\",\"message\":\"Motors stopped.\"}");
 }
 
 void readEncoderM1()
