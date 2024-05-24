@@ -2,6 +2,7 @@
 #include <Adafruit_MotorShield.h>
 #include <PinChangeInterrupt.h>
 #include <ArxContainer.h>
+#include "calculations.h"
 
 #define ENCA 3 // RR
 #define ENCB 7 // RL
@@ -246,37 +247,13 @@ void startSystem()
   Serial.println("System Starting...");
 }
 
-// void runSystem() {
-//   if (not trajFinished){
-//     Serial.println("System Running...");
-//     moveRobot(20, 20, 'F');
-//     trajFinished = true;
-//   }
-// }
-
 // Function to move the robot in a specified direction for a certain distance
 void moveRobot(float value, float speed, char type, bool callibFlag, bool initialCallibFlag)
 {
-
-  int targetCounts = 0;
-  if (type == 'T')
-  {
-    float wheelBase = 23.0;
-    float rotationCircumference = PI * wheelBase;
-    float degreesPerCm = 360 / rotationCircumference;
-    float distanceCm = value / degreesPerCm;
-    targetCounts = floor(abs(distanceCm * calibratedCountsPerCmT));
-  }
-  else if (type == 'F' || type == 'B')
-  {
-    targetCounts = floor(value * calibratedCountsPerCmFB);
-  }
-  else
-  {
-    targetCounts = floor(value * calibratedCountsPerCmRL);
-  }
+  int targetCounts = calculateTargetCounts(value, getCalibratedCountsPerCm(type), type);
   Serial.print("targetCounts: ");
   Serial.println(targetCounts);
+
   // Reset encoder positions
   posiM1 = 0;
   posiM2 = 0;
@@ -285,8 +262,6 @@ void moveRobot(float value, float speed, char type, bool callibFlag, bool initia
 
   // Set speeds depending on the direction
   setMotorSpeedsBasedOnDirection(speed, type, value);
-
-  // applyMotorSpeeds();
 
   bool obstacleDetected = false;
   int prevPosition = 0;
@@ -438,16 +413,6 @@ bool checkForObstacles(char direction)
     Serial.print("Obstacle right: ");
     Serial.println(digitalRead(RIGHT_SENSOR_PIN));
     return digitalRead(RIGHT_SENSOR_PIN) == HIGH;
-  // case 'T':
-  //     if (digitalRead(FRONT_SENSOR_PIN) == HIGH) {
-  //       return true;
-  //     } else if (digitalRead(BACK_SENSOR_PIN) == HIGH) {
-  //       return true;
-  //     } else if (digitalRead(LEFT_SENSOR_PIN) == HIGH) {
-  //       return true;
-  //     } else if (digitalRead(RIGHT_SENSOR_PIN) == HIGH) {
-  //       return true;
-  //     }
   default:
     return false;
   }
@@ -518,7 +483,6 @@ int calculateEffectivePosition(int posM1, int posM2, int posM3, int posM4, char 
 
 void addTask(char type, float value, float speed, bool calibrationEnd, float calibrationRollbackDist, bool initialCallib)
 {
-  // Serial.println(calibrationRollbackDist);
   Task newTask = {type, value, speed, calibrationRollbackDist, calibrationEnd, initialCallib};
   taskQueue.push_back(newTask);
 }
@@ -560,7 +524,6 @@ void processTasks()
       // Serial.println("Task done!");
       moveRobot(calibDist, calibSpeed, currentTask.type, true, false);
       Serial.println("Calibrating...");
-      // Serial.println(calibRollbackType);
       delay(50);
       Serial.println(currentTask.calibrationRollbackDist);
       moveRobot(currentTask.calibrationRollbackDist, calibSpeed, calibRollbackType, true, false);
@@ -655,20 +618,10 @@ void calculateWheelSpeeds()
   float wheelSpeedCmS_RL = linearX + linearY - angularVelocityCmS;
   float wheelSpeedCmS_RR = linearX - linearY - angularVelocityCmS;
 
-  //  Serial.println(wheelSpeedCmS_FL);
-  //  Serial.println(wheelSpeedCmS_FR);
-  //  Serial.println(wheelSpeedCmS_RL);
-  //  Serial.println(wheelSpeedCmS_RR);
-
   m1Speed = (wheelSpeedCmS_FR * 60) / c;
   m2Speed = (wheelSpeedCmS_RR * 60) / c;
   m3Speed = (wheelSpeedCmS_FL * 60) / c;
   m4Speed = (wheelSpeedCmS_RL * 60) / c;
-
-  // Serial.println(m1Speed);
-  // Serial.println(m2Speed);
-  // Serial.println(m3Speed);
-  // Serial.println(m4Speed);
 }
 
 void computeSpeed()
@@ -688,14 +641,6 @@ void computeSpeed()
   rpmM2 = (posM2 / 800.0) * (60000.0 / timeDiff);
   rpmM3 = (posM3 / 800.0) * (60000.0 / timeDiff);
   rpmM4 = (posM4 / 800.0) * (60000.0 / timeDiff);
-  // Serial.print("speedFR:");
-  // Serial.println(rpmM1);
-  // Serial.print("speedRR:");
-  // Serial.println(rpmM2);
-  // Serial.print("speedFL:");
-  // Serial.println(rpmM3);
-  // Serial.print("speedRL:");
-  // Serial.println(rpmM4);
 
   prevTime = currentTime;
   posiM1 = 0;
@@ -706,28 +651,24 @@ void computeSpeed()
 
 void computePower()
 {
-
   currentTimePID = millis();
   unsigned long timeDiffPID = currentTimePID - prevTimePID;
 
-  // erreur
   eM1 = m1Speed - rpmM1;
   eM2 = m2Speed - rpmM2;
   eM3 = m3Speed - rpmM3;
   eM4 = m4Speed - rpmM4;
-  // erreur dérivée
+
   float dedtM1 = (eM1 - prevEM1) / (timeDiffPID);
   float dedtM2 = (eM2 - prevEM2) / (timeDiffPID);
   float dedtM3 = (eM3 - prevEM3) / (timeDiffPID);
   float dedtM4 = (eM4 - prevEM4) / (timeDiffPID);
 
-  // erreur intégrale
   eIntegralM1 = eIntegralM1 + eM1 * timeDiffPID;
   eIntegralM2 = eIntegralM2 + eM2 * timeDiffPID;
   eIntegralM3 = eIntegralM3 + eM3 * timeDiffPID;
   eIntegralM4 = eIntegralM4 + eM4 * timeDiffPID;
 
-  // signal de contrôle
   pwmM1 = kp * eM1 + kd * dedtM1 + ki * eIntegralM1;
   pwmM2 = kp * eM2 + kd * dedtM2 + ki * eIntegralM2;
   pwmM3 = kp * eM3 + kd * dedtM3 + ki * eIntegralM3;
@@ -766,8 +707,6 @@ void computePower()
     pwmM4 = 255;
   }
 
-  // Serial.println(pwmM1);
-
   prevEM1 = eM1;
   prevEM2 = eM2;
   prevEM3 = eM3;
@@ -777,7 +716,6 @@ void computePower()
 
 void applyMotorSpeeds()
 {
-
   if (m1Speed >= 0)
   {
     FR->setSpeed(min(abs(m1Speed), 255));
@@ -825,9 +763,24 @@ void applyMotorSpeeds()
 
 void stop()
 {
-
   FL->run(RELEASE);
   FR->run(RELEASE);
   RL->run(RELEASE);
   RR->run(RELEASE);
+}
+
+float getCalibratedCountsPerCm(char type)
+{
+  if (type == 'F' || type == 'B')
+  {
+    return calibratedCountsPerCmFB;
+  }
+  else if (type == 'L' || type == 'R')
+  {
+    return calibratedCountsPerCmRL;
+  }
+  else
+  {
+    return calibratedCountsPerCmT;
+  }
 }
